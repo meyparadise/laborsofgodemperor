@@ -1,0 +1,2 @@
+- Refactor laborsofgodemperor repo
+- Clean up github repos and orgs

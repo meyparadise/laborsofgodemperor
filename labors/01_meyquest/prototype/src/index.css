@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-crimson-50: #fef2f2;
+  --color-crimson-100: #ffe1e1;
+  --color-crimson-200: #ffc8c8;
+  --color-crimson-300: #ffa3a3;
+  --color-crimson-400: #ff6e6e;
+  --color-crimson-500: #f83b3b;
+  --color-crimson-600: #e51a1a;
+  --color-crimson-700: #c01010;
+  --color-crimson-800: #9f1212;
+  --color-crimson-900: #841616;
+  --color-crimson-950: #2c0505;
+
+  --color-surface-50: #f8f9fa;
+  --color-surface-100: #1a1a2e;
+  --color-surface-200: #16162a;
+  --color-surface-300: #121224;
+  --color-surface-400: #0e0e1e;
+  --color-surface-500: #0a0a18;
+  --color-surface-600: #060612;
+  --color-surface-700: #04040c;
+  --color-surface-800: #020208;
+  --color-surface-900: #010104;
+  --color-surface-950: #000002;
+
+  --color-gold-400: #f0c040;
+  --color-gold-500: #d4a020;
+  --color-gold-600: #b08010;
+
+  --font-display: "Cinzel", serif;
+  --font-body: "Inter", sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: color-mix(in srgb, var(--color-crimson-700) 20%, transparent);
+  }
+  body {
+    @apply bg-surface-900 text-surface-50 antialiased;
+    font-family: var(--font-body);
+  }
+}
+
+@utility scrollbar-thin {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: var(--color-surface-800);
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-crimson-800);
+    border-radius: 3px;
+  }
+}
+
+@utility glass {
+  background: color-mix(in srgb, var(--color-surface-200) 85%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--color-crimson-700) 25%, transparent);
+}
+
+@utility glow-crimson {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-crimson-600) 30%, transparent),
+              0 0 60px color-mix(in srgb, var(--color-crimson-700) 10%, transparent);
+}
+
+@utility glow-gold {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-gold-400) 30%, transparent),
+              0 0 60px color-mix(in srgb, var(--color-gold-500) 10%, transparent);
+}

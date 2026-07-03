@@ -1,0 +1,614 @@
+import { useNavigate } from 'react-router-dom'
+import { Shield, Clock, CheckCircle, XCircle, Package, Sparkles, Eye, Flame, Target, Scale, Timer, User, ChevronDown, ChevronUp, Search } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { useGameStore } from '@/stores/gameStore'
+import { FACTION_INFO, HEROES, BADGE_CHAINS, ALL_ITEMS } from '@/data/mock'
+import { Card, RarityBadge, Button } from '@/components/ui/ui'
+import { VirtueBar, getVirtueTier, VIRTUE_META } from '@/components/ui/virtues'
+import { ChipGroup, DropdownFilter } from '@/components/ui/filters'
+import { TierBadge } from '@/components/ui/badges'
+import { clsx } from 'clsx'
+import type { VirtueName, SlotType, Badge, PredictionResult, Category, BadgeCategory, VirtueTierLevel } from '@/types'
+
+const TIER_NAMES: Record<VirtueTierLevel, string> = { 0: 'Novice', 1: 'Initiate', 2: 'Adept', 3: 'Master' }
+
+// ── Cheat Panel ──
+
+function CheatPanel() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [tab, setTab] = useState('stats')
+  const player = useGameStore(s => s.player)
+  const store = useGameStore
+  const [testQuestId, setTestQuestId] = useState('')
+  const [testOutcome, setTestOutcome] = useState<'YES' | 'NO'>('YES')
+  const [testAmount, setTestAmount] = useState(100)
+  const [importJson, setImportJson] = useState('')
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsOpen(false) }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isOpen])
+
+  const log = useCallback((msg: string) => { console.debug(`[CheatPanel] ${msg}`) }, [])
+
+  if (!import.meta.env.DEV) return null
+
+  const tabs = ['stats', 'currency', 'items', 'heroes', 'quests', 'data']
+  const tabLabels: Record<string, string> = { stats: 'Stats', currency: 'Currency', items: 'Items', heroes: 'Heroes', quests: 'Quests', data: 'Data' }
+
+  return (
+    <>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 left-72 z-50 w-10 h-10 rounded-full bg-surface-800/80 border border-crimson-700/30 flex items-center justify-center opacity-50 hover:opacity-100 hover:glow-crimson transition-all"
+        title="Dev Panel"
+      >
+        {isOpen ? <X size={18} className="text-crimson-300" /> : <Wrench size={18} className="text-surface-50/60" />}
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsOpen(false)} />
+          <div className="fixed top-0 left-0 w-80 h-full z-50 glass border-r border-crimson-700/30 overflow-y-auto scrollbar-thin p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-crimson-300">DEV TOOLS</h3>
+              <button onClick={() => setIsOpen(false)} className="text-surface-50/40 hover:text-crimson-400"><X size={16} /></button>
+            </div>
+            <div className="flex gap-1 bg-surface-800/60 rounded-lg p-1">
+              {tabs.map(t => (
+                <button key={t} onClick={() => setTab(t)} className={clsx('flex-1 rounded-md px-2 py-1 text-[10px] font-medium', tab === t ? 'bg-crimson-900/60 text-crimson-300 border border-crimson-700/40' : 'text-surface-50/40')}>
+                  {tabLabels[t]}
+                </button>
+              ))}
+            </div>
+
+            {tab === 'stats' && (
+              <div className="space-y-3">
+                <div className="flex gap-2 items-center"><span className="text-xs text-surface-50/40 w-16">Level</span><input type="number" value={player.level} onChange={e => { log(`setLevel(${e.target.value})`); store.getState().setLevel(Number(e.target.value)) }} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-xs w-20" /></div>
+                <div className="flex gap-2 items-center"><span className="text-xs text-surface-50/40 w-16">XP</span><input type="number" value={player.xp} onChange={e => { log(`setXP(${e.target.value})`); store.getState().setXP(Number(e.target.value)) }} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-xs w-20" /><Button size="xs" variant="ghost" onClick={() => { log('addXP(500)'); store.getState().addXP(500) }}>+500</Button></div>
+                <div className="flex gap-2 items-center"><span className="text-xs text-surface-50/40 w-16">Skill Pts</span><input type="number" value={player.skillPoints} onChange={e => { log(`setSkillPoints(${e.target.value})`); store.getState().setSkillPoints(Number(e.target.value)) }} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-xs w-20" /></div>
+                <div className="space-y-1">
+                  <span className="text-xs text-surface-50/40">Virtues</span>
+                  {(['wisdom', 'courage', 'prudence', 'skill', 'temperance', 'justice'] as VirtueName[]).map(v => (
+                    <div key={v} className="flex gap-2 items-center"><span className="text-[10px] text-surface-50/30 w-20 capitalize">{v}</span><input type="range" min={1} max={20} value={player.virtues[v]} onChange={e => store.getState().setStat(v, Number(e.target.value))} className="flex-1 h-2" /><span className="text-xs font-mono w-6">{player.virtues[v]}</span></div>
+                  ))}
+                </div>
+                <Button variant="danger" size="sm" onClick={() => { log('maxAll()'); store.getState().maxAll() }} className="w-full">Max All</Button>
+              </div>
+            )}
+
+            {tab === 'currency' && (
+              <div className="space-y-3">
+                <div className="flex gap-2 items-center"><span className="text-xs text-surface-50/40">Fate (MP)</span><input type="number" value={player.insightPoints} onChange={e => store.getState().setInsightPoints(Number(e.target.value))} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-xs w-24" /></div>
+                <div className="flex gap-1 flex-wrap">
+                  {[100, 500, 1000, 5000].map(n => <Button key={n} size="xs" variant="gold" onClick={() => { log(`addMP(+${n})`); store.getState().addInsightPoints(n) }}>+{n}</Button>)}
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {[100, 500, 1000, 5000].map(n => <Button key={n} size="xs" variant="ghost" className="text-red-400" onClick={() => { log(`addMP(-${n})`); store.getState().addInsightPoints(-n) }}>-{n}</Button>)}
+                </div>
+              </div>
+            )}
+
+            {tab === 'items' && (
+              <div className="space-y-3">
+                <div className="text-xs text-surface-50/40">Inventory: {player.inventory.length} items</div>
+                <div className="flex gap-1 flex-wrap">
+                  {(['mythic', 'rare', 'uncommon', 'common'] as const).map(r => {
+                    const rItems = ALL_ITEMS.filter(i => i.rarity === r)
+                    return <Button key={r} size="xs" variant="gold" onClick={() => { log(`spawnAll(${r})`); rItems.forEach(i => store.getState().addItemToInventory(i.id)) }}>All {r}</Button>
+                  })}
+                </div>
+                <div className="space-y-1 max-h-60 overflow-y-auto">
+                  {ALL_ITEMS.map(item => {
+                    const owned = player.inventory.some(i => i.id === item.id)
+                    return (
+                      <div key={item.id} className="flex items-center justify-between glass rounded p-2">
+                        <div><p className="text-xs font-medium">{item.name}</p><p className="text-[9px] text-surface-50/30">{item.slotType} &middot; <RarityBadge rarity={item.rarity} /></p></div>
+                        <Button size="xs" variant={owned ? 'ghost' : 'gold'} disabled={owned} onClick={() => { log(`spawnItem(${item.id})`); store.getState().addItemToInventory(item.id) }}>{owned ? 'Owned' : 'Spawn'}</Button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <Button size="sm" variant="danger" onClick={() => { if (confirm('Clear all items?')) { log('clearInventory()'); store.getState().clearInventory() } }} className="w-full">Clear Inventory</Button>
+              </div>
+            )}
+
+            {tab === 'heroes' && (
+              <div className="space-y-2">
+                <div className="text-xs text-surface-50/40">Following: {player.followedHeroes.length}/10</div>
+                {HEROES.map(hero => {
+                  const following = player.followedHeroes.includes(hero.id)
+                  return (
+                    <div key={hero.id} className="flex items-center justify-between glass rounded p-2">
+                      <div><p className="text-xs font-medium">{hero.name}</p><p className="text-[9px] text-surface-50/30">{hero.slotType} &middot; {FACTION_INFO[hero.faction].name}</p></div>
+                      <Button size="xs" variant={following ? 'danger' : 'gold'} onClick={() => { log(`${following ? 'unfollow' : 'follow'}Hero(${hero.id})`); following ? store.getState().unfollowHero(hero.id) : store.getState().followHero(hero.id) }}>{following ? 'Unfollow' : 'Follow'}</Button>
+                    </div>
+                  )
+                })}
+                <div className="flex gap-2">
+                  <Button size="sm" variant="gold" onClick={() => { log('followAllHeroes()'); store.getState().followAllHeroes() }}>Follow All</Button>
+                  <Button size="sm" variant="danger" onClick={() => { log('unfollowAllHeroes()'); store.getState().unfollowAllHeroes() }}>Unfollow All</Button>
+                </div>
+              </div>
+            )}
+
+            {tab === 'quests' && (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {useGameStore.getState().quests.map(q => (
+                  <div key={q.id} className="glass rounded p-2 space-y-1">
+                    <p className="text-xs font-medium truncate">{q.question}</p>
+                    <div className="flex gap-1 flex-wrap">
+                      {q.status === 'OPEN' ? (
+                        <>
+                          <Button size="xs" variant="crimson" onClick={() => { log(`resolveQuest(${q.id}, YES)`); store.getState().resolveQuest(q.id, 'YES') }}>Won</Button>
+                          <Button size="xs" variant="danger" onClick={() => { log(`resolveQuest(${q.id}, NO)`); store.getState().resolveQuest(q.id, 'NO') }}>Lost</Button>
+                        </>
+                      ) : (
+                        <Button size="xs" variant="ghost" onClick={() => { log(`reopenQuest(${q.id})`); store.getState().reopenQuest(q.id) }}>Reopen</Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                <Button size="sm" variant="gold" onClick={() => { log('resolveAllRandom()'); store.getState().resolveAllRandom() }} className="w-full">Resolve All Random</Button>
+                <div className="glass rounded p-3 space-y-2">
+                  <p className="text-xs font-medium text-surface-50/60">Create Test Bet</p>
+                  <select value={testQuestId} onChange={e => setTestQuestId(e.target.value)} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-xs w-full text-surface-50">
+                    <option value="">Select quest...</option>
+                    {useGameStore.getState().quests.map(q => <option key={q.id} value={q.id}>{q.question.slice(0, 40)}...</option>)}
+                  </select>
+                  <div className="flex gap-2">
+                    <button onClick={() => setTestOutcome('YES')} className={clsx('flex-1 rounded px-2 py-1 text-xs border', testOutcome === 'YES' ? 'bg-green-900/40 border-green-600/40 text-green-400' : 'border-surface-300/20 text-surface-50/40')}>YES</button>
+                    <button onClick={() => setTestOutcome('NO')} className={clsx('flex-1 rounded px-2 py-1 text-xs border', testOutcome === 'NO' ? 'bg-red-900/40 border-red-600/40 text-red-400' : 'border-surface-300/20 text-surface-50/40')}>NO</button>
+                  </div>
+                  <input type="number" value={testAmount} onChange={e => setTestAmount(Number(e.target.value))} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-xs w-full" />
+                  <Button size="sm" variant="crimson" className="w-full" onClick={() => { if (!testQuestId) return; log(`placePrediction(${testQuestId}, ${testOutcome}, ${testAmount})`); store.getState().placePrediction(testQuestId, testOutcome, testAmount, 50) }} disabled={!testQuestId}>Place Bet</Button>
+                  <div className="flex gap-1">
+                    <Button size="xs" variant="ghost" onClick={() => { useGameStore.getState().quests.forEach(q => q.status === 'OPEN' && store.getState().placePrediction(q.id, 'YES', 100, 50)); log('bet YES on all OPEN') }}>Bet YES all</Button>
+                    <Button size="xs" variant="ghost" onClick={() => { useGameStore.getState().quests.forEach(q => q.status === 'OPEN' && store.getState().placePrediction(q.id, 'NO', 100, 50)); log('bet NO on all OPEN') }}>Bet NO all</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab === 'data' && (
+              <div className="space-y-2">
+                <Button variant="danger" size="sm" className="w-full" onClick={() => { if (confirm('Wipe ALL data? This cannot be undone.')) { log('resetEverything()'); localStorage.removeItem('meyquest-game-state'); window.location.reload() } }}>Reset Everything</Button>
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => { log('resetPlayer()'); store.getState().resetPlayer() }}>Reset to Default</Button>
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => { log('clearPredictions()'); store.getState().clearPredictions() }}>Clear Predictions</Button>
+                <Button variant="ghost" size="sm" className="w-full" onClick={() => { log('resetSkills()'); store.getState().resetSkills() }}>Clear Skills</Button>
+                <Button variant="gold" size="sm" className="w-full" onClick={() => { log('exportState()'); navigator.clipboard.writeText(JSON.stringify(store.getState().exportState(), null, 2)) }}>Export State to Clipboard</Button>
+                <div className="space-y-1">
+                  <p className="text-xs text-surface-50/40">Import State</p>
+                  <textarea value={importJson} onChange={e => setImportJson(e.target.value)} className="bg-surface-700 border border-surface-500/30 rounded px-2 py-1 text-[10px] font-mono w-full h-24 text-surface-50" placeholder='Paste JSON here...' />
+                  <Button size="sm" variant="crimson" className="w-full" onClick={() => { try { const parsed = JSON.parse(importJson); log('importState()'); store.getState().importState(parsed); setImportJson('') } catch { alert('Invalid JSON') } }}>Load State</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+// ── Profile Page ──
+
+const RESULT_COLORS: Record<PredictionResult, string> = { WON: 'text-green-400 bg-green-500/10', LOST: 'text-red-400 bg-red-500/10', PENDING: 'text-surface-50/40 bg-surface-300/20' }
+
+function Tooltip({ children, content }: { children: React.ReactNode; content: React.ReactNode }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div className="relative" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      {children}
+      {show && (
+        <div className="absolute z-30 bottom-full left-0 mb-1 w-56 glass rounded-lg p-2 border border-crimson-600/40 shadow-lg text-xs">
+          {content}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ProfilePage() {
+  const player = useGameStore(s => s.player)
+  const equipItem = useGameStore(s => s.equipItem)
+  const unequipItem = useGameStore(s => s.unequipItem)
+  const navigate = useNavigate()
+
+  const faction = FACTION_INFO[player.faction]
+  const wonCount = player.correctPredictions
+  const lostCount = player.predictions.filter(p => p.result === 'LOST').length
+  const pendingCount = player.predictions.filter(p => p.result === 'PENDING').length
+  const winRate = (wonCount + lostCount) > 0 ? Math.round((wonCount / (wonCount + lostCount)) * 100) : 0
+  const netPL = player.predictions.reduce((sum, p) => sum + p.netProfit, 0)
+  const equippedIds = Object.values(player.equippedItems).filter(Boolean) as string[]
+  const followedHeroes = HEROES.filter(h => player.followedHeroes.includes(h.id))
+  const activeTax = Object.values(player.equippedItems).reduce((sum, id) => { const item = player.inventory.find(i => i.id === id); return sum + (item?.passiveCost ?? 0) }, 0)
+
+  // Inventory state
+  const [invSearch, setInvSearch] = useState('')
+  const [invState, setInvState] = useState('ALL')
+  const [invSlot, setInvSlot] = useState('ALL')
+  const [invClass, setInvClass] = useState('ALL')
+  const filteredInventory = useMemo(() => {
+    return player.inventory.filter(item => {
+      if (invSearch && !item.name.toLowerCase().includes(invSearch.toLowerCase())) return false
+      if (invState === 'EQUMPPED' && !equippedIds.includes(item.id)) return false
+      if (invState === 'UNEQUMPPED' && equippedIds.includes(item.id)) return false
+      if (invSlot !== 'ALL' && item.slotType !== invSlot) return false
+      if (invClass !== 'ALL' && item.itemClass !== invClass) return false
+      return true
+    })
+  }, [player.inventory, invSearch, invState, invSlot, invClass, equippedIds])
+
+  // History state
+  const [histResult, setHistResult] = useState('ALL')
+  const [histCategory, setHistCategory] = useState('ALL')
+  const [histDate, setHistDate] = useState('ALL')
+  const [expandedPred, setExpandedPred] = useState<string | null>(null)
+  const filteredPredictions = useMemo(() => {
+    let preds = [...player.predictions].reverse()
+    if (histResult !== 'ALL') preds = preds.filter(p => p.result === histResult)
+    if (histCategory !== 'ALL') preds = preds.filter(p => p.questCategory === histCategory)
+    if (histDate === 'WEEK') {
+      const weekAgo = new Date(Date.now() - 7 * 86400000)
+      preds = preds.filter(p => new Date(p.placedAt) > weekAgo)
+    } else if (histDate === 'MONTH') {
+      const monthAgo = new Date(Date.now() - 30 * 86400000)
+      preds = preds.filter(p => new Date(p.placedAt) > monthAgo)
+    }
+    return preds
+  }, [player.predictions, histResult, histCategory, histDate])
+
+  // Badge state
+  const [badgeCat, setBadgeCat] = useState<BadgeCategory | 'ALL'>('ALL')
+  const visibleChains = badgeCat === 'ALL' ? BADGE_CHAINS : BADGE_CHAINS.filter(c => c.category === badgeCat)
+
+  // Tooltip state for inventory
+  const [tooltipItem, setTooltipItem] = useState<string | null>(null)
+
+  return (
+    <div className="max-w-5xl space-y-6 pb-16">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-crimson-300" style={{ fontFamily: 'Cinzel, serif' }}>Profile</h2>
+          <p className="text-surface-50/50 mt-1">Your oracular character sheet</p>
+        </div>
+        <Button variant="ghost" onClick={() => navigate('/build')}>
+          <Sparkles size={14} className="mr-1" /> Skill Tree ({player.skillPoints} pts)
+        </Button>
+      </div>
+
+      {/* Identity Bar */}
+      <Card glow className="flex items-center gap-6 p-6">
+        <div className="w-20 h-20 rounded-full bg-crimson-900/60 border-2 border-crimson-600/40 flex items-center justify-center text-3xl font-bold text-crimson-300" style={{ fontFamily: 'Cinzel, serif' }}>
+          {player.username[0]}
+        </div>
+        <div className="flex-1">
+          <h3 className="text-2xl font-bold">{player.username}</h3>
+          <div className="flex items-center gap-4 mt-1 flex-wrap">
+            <span className="text-surface-50/50 text-sm">Lv.{player.level}</span>
+            <span className="text-gold-400 font-mono text-sm">{player.insightPoints} MP</span>
+            <Tooltip content={<><p className="font-medium" style={{ color: faction.color }}>{faction.name}</p><p className="text-surface-50/50">{faction.description}</p><p className="text-surface-50/30 mt-1 capitalize">Linked virtue: {faction.linkedVirtue}</p></>}>
+              <span className="text-sm flex items-center gap-1 cursor-help" style={{ color: faction.color }}><Shield size={14} /> {faction.name}</span>
+            </Tooltip>
+            <span className="text-sm text-surface-50/50">{player.skillPoints} skill pts</span>
+            <span className="text-sm text-surface-50/50">{player.followedHeroes.length}/10 Heroes</span>
+          </div>
+          <div className="w-full bg-surface-800 rounded-full h-2 mt-3">
+            <div className="bg-crimson-600 h-2 rounded-full" style={{ width: `${player.xp % 100}%` }} />
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-xs text-surface-50/40">Win Rate</p>
+          <p className="text-2xl font-bold text-green-400">{winRate}%</p>
+          <p className="text-xs text-surface-50/30">{wonCount}W · {lostCount}L &middot; {pendingCount}P</p>
+          <p className={clsx('text-xs font-mono mt-1', netPL >= 0 ? 'text-green-400' : 'text-red-400')}>{netPL >= 0 ? '+' : ''}{netPL} MP net</p>
+        </div>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Virtues */}
+        <Card>
+          <h3 className="text-lg font-bold mb-4 text-surface-50/80">Virtues</h3>
+          <div className="space-y-4">
+            {(Object.keys(player.virtues) as VirtueName[]).map(v => (
+              <VirtueBar key={v} virtue={v} value={player.virtues[v]} />
+            ))}
+          </div>
+          <div className="mt-4 pt-3 border-t border-surface-700/50 flex items-center justify-between">
+            <span className="text-xs text-surface-50/40">Total Virtue Power</span>
+            <span className="font-mono text-sm text-gold-400">{Object.values(player.virtues).reduce((a, b) => a + b, 0)} / 120</span>
+          </div>
+        </Card>
+
+        {/* Equipped Items */}
+        <div className="space-y-6">
+          <Card>
+            <h3 className="text-lg font-bold mb-4">Equipped Items</h3>
+            {followedHeroes.length === 0 ? (
+              <p className="text-sm text-surface-50/40">Follow heroes to unlock equipment slots. Visit the Atlas to find heroes.</p>
+            ) : (
+              <div className="space-y-2">
+                {followedHeroes.map(hero => {
+                  const slot = hero.slotType
+                  const itemId = player.equippedItems[slot]
+                  const equipped = itemId ? player.inventory.find(i => i.id === itemId) : null
+                  return (
+                    <div key={slot} className="glass rounded-lg p-3 flex items-center gap-3">
+                      <span className="text-sm font-medium text-surface-50/70 capitalize w-24 shrink-0">{slot}</span>
+                      <div className="flex-1 min-w-0">
+                        {equipped ? (
+                          <Tooltip content={<><div className="flex items-center gap-1"><p className="font-bold">{equipped.name}</p><RarityBadge rarity={equipped.rarity} /></div><p className="text-surface-50/50 italic">&ldquo;{equipped.flavorText}&rdquo;</p>{Object.entries(equipped.statBonuses).map(([k, v]) => <p key={k} className="text-surface-50/60 capitalize">+{v} {k}</p>)}{equipped.uniqueEffect && <p className="text-gold-400 mt-1">{equipped.uniqueEffect.name}: {equipped.uniqueEffect.description}</p>}{equipped.passiveCost > 0 && <p className="text-surface-50/30">Passive cost: {equipped.passiveCost}%</p>}</>}>
+                            <div className="flex items-center gap-2 cursor-help">
+                              <p className="text-sm font-medium text-gold-400">{equipped.name}</p>
+                              <RarityBadge rarity={equipped.rarity} />
+                              {equipped.passiveCost > 0 && <span className="text-[10px] text-surface-50/30">{equipped.passiveCost}% tax</span>}
+                            </div>
+                          </Tooltip>
+                        ) : (
+                          <p className="text-xs text-surface-50/30">Empty</p>
+                        )}
+                      </div>
+                      {equipped && (
+                        <button onClick={() => unequipItem(slot)} className="text-[10px] text-red-400 hover:underline shrink-0">Unequip</button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            {activeTax > 0 && (
+              <p className="text-xs text-surface-50/40 mt-3 pt-2 border-t border-surface-700/50">
+                Active Tax: <span className={clsx(activeTax <= 3 ? 'text-green-400' : activeTax <= 8 ? 'text-yellow-400' : 'text-red-400')}>{activeTax}%</span> of winnings
+              </p>
+            )}
+          </Card>
+
+          {/* Hero Followers */}
+          <Card>
+            <h3 className="text-lg font-bold mb-4">Heroes Followed</h3>
+            {followedHeroes.length === 0 ? (
+              <p className="text-sm text-surface-50/40">No heroes followed yet. Following heroes unlocks equipment slots and grants virtue bonuses.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {followedHeroes.map(hero => (
+                  <Tooltip key={hero.id} content={<><p className="font-medium">{hero.name} — {hero.title}</p><p className="text-surface-50/50 capitalize">Unlocks: {hero.slotType} equipment slot</p><p className="text-surface-50/30 mt-1">{hero.bio}</p></>}>
+                    <div className="glass rounded-lg p-3 flex items-center gap-2 cursor-help">
+                      <div className="w-8 h-8 rounded-full bg-crimson-900/40 flex items-center justify-center font-bold text-xs">{hero.name[0]}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium">{hero.name}</p>
+                        <p className="text-[9px] text-surface-50/40 capitalize">{hero.slotType} slot</p>
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); useGameStore.getState().unfollowHero(hero.id) }} className="text-[10px] text-red-400 hover:underline shrink-0">Unfollow</button>
+                    </div>
+                  </Tooltip>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Inventory */}
+        <Card className="lg:col-span-2">
+          <div className="flex items-center gap-2 mb-3">
+            <Package size={16} className="text-crimson-400" />
+            <h3 className="text-lg font-bold">Inventory</h3>
+            <span className="text-xs text-surface-50/30 ml-auto">{player.inventory.length} items</span>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <div className="flex items-center gap-1 bg-surface-700 rounded px-2 py-1 flex-1 min-w-[120px]">
+              <Search size={12} className="text-surface-50/30" />
+              <input placeholder="Search..." value={invSearch} onChange={e => setInvSearch(e.target.value)} className="bg-transparent text-xs outline-none flex-1" />
+            </div>
+            <DropdownFilter label="Slot" options={[{ label: 'All', value: 'ALL' }, { label: 'Vision', value: 'vision' }, { label: 'Algorithm', value: 'algorithm' }, { label: 'Network', value: 'network' }, { label: 'Conduit', value: 'conduit' }, { label: 'Capital', value: 'capital' }, { label: 'Data', value: 'data' }, { label: 'Narrative', value: 'narrative' }, { label: 'Resonance', value: 'resonance' }, { label: 'Cascade', value: 'cascade' }, { label: 'Anomaly', value: 'anomaly' }]} value={invSlot} onChange={setInvSlot} />
+            <DropdownFilter label="Class" options={[{ label: 'All', value: 'ALL' }, { label: 'Equipment', value: 'equipment' }, { label: 'Weapon', value: 'weapon' }, { label: 'Active', value: 'active' }]} value={invClass} onChange={setInvClass} />
+            <ChipGroup options={[{ label: 'All', value: 'ALL' }, { label: 'Equipped', value: 'EQUMPPED' }, { label: 'Unequipped', value: 'UNEQUMPPED' }]} selected={invState} onChange={setInvState} />
+          </div>
+          {filteredInventory.length === 0 ? (
+            <p className="text-sm text-surface-50/40 py-4 text-center">No items match. Complete quests to earn loot!</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {filteredInventory.map(item => {
+                const isEquipped = equippedIds.includes(item.id)
+                const hasSlot = followedHeroes.some(h => h.slotType === item.slotType)
+                return (
+                  <div key={item.id} className="relative" onMouseEnter={() => setTooltipItem(item.id)} onMouseLeave={() => setTooltipItem(null)}>
+                    <div className={clsx('glass rounded-lg p-3 transition-all', isEquipped ? 'border-crimson-500/40' : hasSlot ? 'hover:border-crimson-500/40' : 'opacity-60')}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium truncate">{item.name}</p>
+                        <RarityBadge rarity={item.rarity} />
+                      </div>
+                      <p className="text-[9px] text-surface-50/40 mt-1 capitalize">{item.slotType} &middot; {item.itemClass}</p>
+                      {Object.entries(item.statBonuses).length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {Object.entries(item.statBonuses).map(([k, v]) => (
+                            <span key={k} className="text-[9px] text-surface-50/60">+{v} {k}</span>
+                          ))}
+                        </div>
+                      )}
+                      {item.passiveCost > 0 && <span className="text-[9px] text-surface-50/30 block mt-1">{item.passiveCost}% tax</span>}
+                      {isEquipped && <span className="text-[9px] text-crimson-400 block mt-1">Equipped</span>}
+                      <div className="flex gap-1 mt-1">
+                        {!isEquipped && hasSlot && (
+                          <button onClick={() => equipItem(item.id, item.slotType)} className="text-[10px] text-gold-400 hover:underline">Equip</button>
+                        )}
+                        {!isEquipped && !hasSlot && (
+                          <span className="text-[9px] text-surface-50/20">Need {item.slotType} hero</span>
+                        )}
+                      </div>
+                    </div>
+                    {tooltipItem === item.id && (
+                      <div className="absolute z-30 bottom-full left-0 mb-2 w-56 glass rounded-lg p-3 border border-crimson-600/40 shadow-lg">
+                        <p className="text-sm font-bold">{item.name}</p>
+                        <RarityBadge rarity={item.rarity} />
+                        <p className="text-[10px] text-surface-50/50 italic mt-1">&ldquo;{item.flavorText}&rdquo;</p>
+                        <p className="text-[10px] text-surface-50/60 mt-1">{item.description}</p>
+                        {Object.entries(item.statBonuses).length > 0 && (
+                          <div className="flex gap-1 mt-1 flex-wrap">
+                            {Object.entries(item.statBonuses).map(([k, v]) => <span key={k} className="text-[10px] text-surface-50/60 capitalize">+{v} {k}</span>)}
+                          </div>
+                        )}
+                        {item.passiveCost > 0 && <p className="text-[10px] text-surface-50/40 mt-1">Passive cost: {item.passiveCost}% of winnings</p>}
+                        {item.uniqueEffect && <p className="text-[10px] text-gold-400 mt-1">{item.uniqueEffect.name}: {item.uniqueEffect.description}</p>}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+
+        {/* Badges — current tier only */}
+        <Card className="lg:col-span-2">
+          <h3 className="text-lg font-bold mb-4">Badges</h3>
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {(['ALL', 'VIRTUE', 'LOYALTY', 'COLLECTION', 'MARKET'] as const).map(cat => (
+              <button key={cat} onClick={() => setBadgeCat(cat)} className={clsx('px-3 py-1 rounded-full text-xs font-medium transition-all border', badgeCat === cat ? 'bg-crimson-900/40 border-crimson-600/40 text-crimson-300' : 'border-surface-300/20 text-surface-50/40 hover:text-surface-50/70')}>
+                {cat === 'ALL' ? 'All' : cat.charAt(0) + cat.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {visibleChains.map(chain => {
+              // Find current tier: highest unlocked, or first locked with progress
+              let currentTier = chain.tiers[0]
+              for (let i = chain.tiers.length - 1; i >= 0; i--) {
+                if (chain.tiers[i].unlocked) { currentTier = chain.tiers[i]; break }
+                if (chain.tiers[i].progress !== undefined) { currentTier = chain.tiers[i]; break }
+              }
+              const isMaxed = chain.tiers[3].unlocked
+              const tierDot = (i: number) => i <= (isMaxed ? 3 : currentTier.tierIndex - (currentTier.unlocked ? 1 : 0)) ? '⬡' : '◇'
+
+              return (
+                <Tooltip key={chain.id} content={<div className="space-y-1"><p className="font-medium">{chain.name} — {chain.description}</p><p className="text-surface-50/50">{currentTier.name}</p><p className="text-surface-50/30">{currentTier.triggerDescription}</p>{!isMaxed && currentTier.progress !== undefined && <p className="text-surface-50/50">Progress: {currentTier.progress}/{currentTier.progressMax}</p>}</div>}>
+                  <div className={clsx('glass rounded-lg p-4 text-center cursor-help transition-all', currentTier.unlocked ? 'border-crimson-600/30' : '')}>
+                    <div className="text-2xl mb-1">{currentTier.unlocked ? '🏆' : isMaxed ? '👑' : '🔒'}</div>
+                    <p className="text-xs font-bold">{chain.name}</p>
+                    <TierBadge tier={currentTier.tier} />
+                    <p className="text-[10px] text-surface-50/50 mt-1">{currentTier.name.split(': ')[1] ?? currentTier.name}</p>
+                    <div className="flex justify-center gap-0.5 mt-2 text-[10px]">
+                      {[0, 1, 2, 3].map(i => (
+                        <span key={i} className={clsx(i <= (isMaxed ? 3 : currentTier.tierIndex - (currentTier.unlocked && !isMaxed && currentTier.tierIndex > 0 ? 0 : currentTier.unlocked ? 0 : 1)) ? 'text-gold-400' : 'text-surface-50/20')}>
+                          {i <= currentTier.tierIndex - (currentTier.unlocked ? 0 : 0) - (isMaxed ? 0 : 0) ? '⬡' : '⬡'}
+                        </span>
+                      ))}
+                    </div>
+                    {currentTier.progress !== undefined && !currentTier.unlocked && (
+                      <div className="w-full bg-surface-800 rounded-full h-1.5 mt-2">
+                        <div className="bg-crimson-600 h-1.5 rounded-full" style={{ width: `${Math.min(100, ((currentTier.progress!) / (currentTier.progressMax!)) * 100)}%` }} />
+                      </div>
+                    )}
+                  </div>
+                </Tooltip>
+              )
+            })}
+          </div>
+        </Card>
+
+        {/* Prediction History */}
+        <Card className="lg:col-span-2">
+          <h3 className="text-lg font-bold mb-4">Prediction History</h3>
+          <div className="flex items-center gap-2 flex-wrap mb-3">
+            <ChipGroup options={[{ label: 'All', value: 'ALL' }, { label: 'Won', value: 'WON' }, { label: 'Lost', value: 'LOST' }, { label: 'Pending', value: 'PENDING' }]} selected={histResult} onChange={setHistResult} />
+            <DropdownFilter label="Cat" options={[{ label: 'All', value: 'ALL' }, { label: 'Politics', value: 'POLITICS' }, { label: 'Tech', value: 'TECH' }, { label: 'Crypto', value: 'CRYPTO' }, { label: 'Sports', value: 'SPORTS' }, { label: 'Culture', value: 'CULTURE' }, { label: 'World', value: 'WORLD' }, { label: 'Finance', value: 'FINANCE' }, { label: 'Science', value: 'SCIENCE' }, { label: 'AI', value: 'AI' }, { label: 'Gaming', value: 'GAMING' }, { label: 'Entertainment', value: 'ENTERTAINMENT' }]} value={histCategory} onChange={setHistCategory} />
+            <ChipGroup options={[{ label: 'All Time', value: 'ALL' }, { label: 'Month', value: 'MONTH' }, { label: 'Week', value: 'WEEK' }]} selected={histDate} onChange={setHistDate} />
+            {(histResult !== 'ALL' || histCategory !== 'ALL' || histDate !== 'ALL') && (
+              <button onClick={() => { setHistResult('ALL'); setHistCategory('ALL'); setHistDate('ALL') }} className="text-[10px] text-crimson-400 hover:underline">Clear</button>
+            )}
+          </div>
+
+          {/* Summary */}
+          <div className="flex gap-2 flex-wrap mb-3">
+            {[
+              { label: 'Bets', value: filteredPredictions.length.toString() },
+              { label: 'Win Rate', value: filteredPredictions.filter(p => p.result !== 'PENDING').length > 0 ? `${Math.round((filteredPredictions.filter(p => p.result === 'WON').length / filteredPredictions.filter(p => p.result !== 'PENDING').length) * 100)}%` : '──' },
+              { label: 'Net P/L', value: `${filteredPredictions.reduce((s, p) => s + p.netProfit, 0) >= 0 ? '+' : ''}${filteredPredictions.reduce((s, p) => s + p.netProfit, 0)} MP` },
+            ].map(stat => (
+              <div key={stat.label} className="glass rounded-lg px-3 py-1.5 text-center">
+                <p className="text-[9px] text-surface-50/40">{stat.label}</p>
+                <p className="text-xs font-mono font-bold">{stat.value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-2">
+            {filteredPredictions.length === 0 ? (
+              <p className="text-sm text-surface-50/40 py-4 text-center">No predictions found. Place your first bet on the Atlas!</p>
+            ) : (
+              filteredPredictions.map(p => {
+                const isExpanded = expandedPred === p.id
+                return (
+                  <div key={p.id}>
+                    <Tooltip content={<><p className="font-medium">{p.outcome} &middot; {p.amount} MP @{p.entryProbability}%</p>{p.heroFollowedName && <p className="text-surface-50/50">Hero: {p.heroFollowedName}</p>}<p className={clsx(p.result === 'WON' ? 'text-green-400' : p.result === 'LOST' ? 'text-red-400' : 'text-surface-50/40', 'mt-1')}>{p.result === 'WON' ? `Won +${p.netProfit} MP` : p.result === 'LOST' ? `Lost -${Math.abs(p.netProfit)} MP` : 'Pending'}</p></>}>
+                      <div onClick={() => setExpandedPred(isExpanded ? null : p.id)} className="flex items-center gap-3 p-3 glass rounded-lg cursor-pointer hover:border-crimson-500/40 transition-all">
+                        <div className={clsx('p-1.5 rounded', RESULT_COLORS[p.result])}>
+                          {p.result === 'WON' ? <CheckCircle size={16} /> : p.result === 'LOST' ? <XCircle size={16} /> : <Clock size={16} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{p.questQuestion}</p>
+                          <div className="flex items-center gap-3 text-xs text-surface-50/40">
+                            <span className={p.outcome === 'YES' ? 'text-green-400' : 'text-red-400'}>{p.outcome}</span>
+                            <span>{p.amount} MP</span>
+                            <span>@{p.entryProbability}%</span>
+                            <span>{new Date(p.placedAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          {p.result === 'WON' && <span className="text-green-400 font-mono text-sm font-bold">+{p.payout}</span>}
+                          {p.result === 'LOST' && <span className="text-red-400 font-mono text-sm">-{p.amount}</span>}
+                          {p.result === 'PENDING' && <span className="text-surface-50/30 font-mono text-sm">──</span>}
+                        </div>
+                        {isExpanded ? <ChevronUp size={14} className="text-surface-50/30 shrink-0" /> : <ChevronDown size={14} className="text-surface-50/30 shrink-0" />}
+                      </div>
+                    </Tooltip>
+                    {isExpanded && (
+                      <div className="glass rounded-lg p-4 ml-3 border-t border-surface-700/50 space-y-2">
+                        {p.heroFollowedId && (
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-crimson-900/40 flex items-center justify-center text-[10px] font-bold">{p.heroFollowedName?.[0]}</div>
+                            <span className="text-xs text-surface-50/60">{p.heroFollowedName} — {p.heroFollowedTitle}</span>
+                          </div>
+                        )}
+                        {p.equippedItems.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-surface-50/30 uppercase tracking-wider">Items Equipped</span>
+                            {p.equippedItems.map(ei => (
+                              <div key={ei.itemId} className="text-xs text-surface-50/50 ml-2">↳ {ei.itemName} ({ei.rarity}): {ei.effectDescription}</div>
+                            ))}
+                          </div>
+                        )}
+                        {p.virtueBonuses.length > 0 && (
+                          <div>
+                            <span className="text-[10px] text-surface-50/30 uppercase tracking-wider">Virtue Bonuses</span>
+                            {p.virtueBonuses.map((vb, i) => (
+                              <div key={i} className="text-xs text-surface-50/50 ml-2 capitalize">↳ {vb.virtue} {vb.virtueValue}: {vb.bonusDescription}</div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="text-xs text-surface-50/30">
+                          Placed: {new Date(p.placedAt).toLocaleString()}
+                          {p.resolvedAt && <span> &middot; Resolved: {new Date(p.resolvedAt).toLocaleString()}</span>}
+                        </div>
+                        {p.result === 'WON' && (
+                          <div className="text-xs text-surface-50/40">
+                            Payout: {p.amount} × (100/{p.entryProbability}) = {p.payout} MP &middot; Net: +{p.netProfit} MP
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <CheatPanel />
+    </div>
+  )
+}

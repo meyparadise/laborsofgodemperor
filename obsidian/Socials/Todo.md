@@ -1,0 +1,12 @@
+- Create patreon, or creator website?
+- Create video introducing the 12 Labors Series and Overview of it's aim
+- Create video introducing meyquest
+- Premote stream on reddit
+- Create other socials, and use them to promote aswell (personal brand GodEmperor)
+	- ~~x~~ 
+	- ~~twitch~~
+	- ~~linkedin~~
+	- ~~tiktok~~
+- How do we make short form content for this?
+- branding for meyparadise
+- branding for meyquest

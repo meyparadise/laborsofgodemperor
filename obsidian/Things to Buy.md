@@ -1,0 +1,4 @@
+- meyparadise.com and meyquest.com $11/year each
+- supabase pro $25/month
+- vercel pro $20/month
+- deepseek tokens topup
