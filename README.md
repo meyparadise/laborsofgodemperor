@@ -38,7 +38,7 @@ laborsofgodemperor/
 
 ---
 
-**▶️ YouTube**: [GodEmperor](https://youtube.com/@godemperor)  
+**▶️ YouTube**: [GodEmperor](https://youtube.com/@godemperorbuddha)  
 **🏷️ Hashtags**: `#12Labors` `#GodEmperor` `#AIStartup` `#RoadToABillion` `#BuildInPublic`
 
 *Started July 2026 — Road to a Billion.* 🏆
